@@ -4,69 +4,109 @@
 #include <time.h>
 #include <string.h>
 #include <signal.h>
+#include <fcntl.h>
+
+#define MAX_ARGS 40
+#define MAX_HIST 10
 
 // Alexander Harris - 260688155
 //
-//TODO: Set up child process creation using fork() and waitpid(), write execvp function for ls/pwd/cd/cat/cp/fg/jobs/exit and background(&), 
+//TODO: Set up output redirection, jobs and background function, sig handling. 
 
 int getcmd(char *prompt, char *args[], int *background)
 {
-	int length, i = 0;
-	char *token, *loc;
-	char *line = NULL;
-	size_t linecap = 0;
-	printf("%s", prompt);
-	length = getline(&line, &linecap, stdin);
-	if(length <= 0){
-		exit(-1);
-	}
+    int length, i = 0;
+    char *token, *loc;
+    char *line = NULL;
+    size_t linecap = 0;
 
-	if((loc = index(line, '&')) != NULL){
-		*background = 1;
-		*loc = ' ';
-	}
-	else{
-		*background = 0;
-	}
+    //Resets args array
+    for (int j = 0; j < MAX_ARGS; j++){
+        args[j] = '\0';
+    }
 
-	while((token = strsep(&line, " \t\n")) != NULL){
-		for(int j = 0; j < strlen(token); j++){
-			if(token[j] <= 32){
-				token[j] = '\0';
-			}
-		}
-		if(strlen(token) > 0){
-			args[i++] = token;
-		}
-		return i;
-	}
+    printf("%s", prompt);
+    length = getline(&line, &linecap, stdin);
+    
+    if(length <= 0){
+        exit(-1);
+    }
+
+    if((loc = index(line, '&')) != NULL){
+        *background = 1;
+        *loc = ' ';
+    }
+    else{
+        *background = 0;
+    }
+
+    while((token = strsep(&line, " \t\n")) != NULL){
+        for(int j = 0; j < strlen(token); j++){
+            if(token[j] <= 32){
+                token[j] = '\0';
+            }
+        }
+        if(strlen(token) > 0){
+            args[i++] = token;
+        }
+    }
+    return i;
 }
 
 int main(void)
 {
-	time_t now;
-	srand((unsigned int) (time(&now)));
+    time_t now;
+    srand((unsigned int) (time(&now)));
 
-	char *args[20];
-	int bg;
-	while(1){
-		bg = 0;
-		memset(args, 0, sizeof(args));
-		int cnt = getcmd("\n>> ", args, &bg);
-		
-		//Increases execution time for syscalls
-		/*int w, rem;
-		w =  rand() % 10;
-		rem = sleep(w);
-		while(rem != 0){
-			rem = sleep(rem);
-		}*/
+    char *args[MAX_ARGS];
+    int bg;
 
-		if(args[0] != NULL){
-			printf("%s\n", args[0]);
-		} 
-		else{
-			printf(" ");
-		}
-	}
+    while(1){
+        bg = 0;
+        int cnt = getcmd("\n>> ", args, &bg);
+
+        if(cnt <= 0){
+            continue;
+        }
+        
+        //Increases execution time for syscalls
+        /*int w, rem;
+        w =  rand() % 10;
+        rem = sleep(w);
+        while(rem != 0){
+            rem = sleep(rem);
+        }*/
+
+        exec(args, bg);
+    }
+}
+
+//test exec
+void exec(char* args[], int bg)
+{
+    pid_t pid;
+
+    if(strcmp(args[0], "exit") == 0){
+        exit(0);
+    }
+    else if(strcmp(args[0], "cd") == 0){
+        int dir = chdir(args[1]);
+        if(dir != 0){
+            printf("Invalid directory.\n");
+        }
+    }
+    else{
+        pid = fork();
+
+        if(pid == 0){
+            execvp(args[0], args);
+        }
+        else if(pid > 0){
+            waitpid(0, NULL, 0);
+        }
+        else{
+            perror("Fork failed.\n");
+            exit(-1);
+        }
+    }
 }
