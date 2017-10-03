@@ -1,3 +1,10 @@
+
+/* 
+* Alexander Harris - 260688155
+* ESCSE 427 - Assignment 1
+* Simple Shell
+*/
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -7,11 +14,8 @@
 #include <fcntl.h>
 
 #define MAX_ARGS 40
-#define MAX_HIST 10
 
-// Alexander Harris - 260688155
-//
-//TODO: Set up output redirection, jobs and background function, sig handling. 
+//TODO: Set up output redirection, jobs and background function, sig handling.
 
 int getcmd(char *prompt, char *args[], int *background)
 {
@@ -81,7 +85,6 @@ int main(void)
     }
 }
 
-//test exec
 void exec(char* args[], int bg)
 {
     pid_t pid;
