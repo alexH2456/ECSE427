@@ -176,14 +176,14 @@ void exec(char* args[], int bg)     //Method for execution of all built-in and o
         while(current != NULL){
             if(waitpid(current->pid, NULL, WNOHANG) == 0){
                 
-                printf("<%d> Running: %s Pid: %d\n", current->number, current->job, current->pid);
+                printf("<%d> %s (Running, Pid: %d)\n", current->number, current->job, current->pid);
                 
                 previous = current;
                 current = current->next;
             }
             else{
                
-                printf("<%d> Finished: %s Pid: %d\n", current->number, current->job, current->pid);
+                printf("<%d> %s (Finished, Pid: %d)\n", current->number, current->job, current->pid);
                
                 head_job = current->next;
                 current = head_job;
