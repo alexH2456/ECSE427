@@ -65,7 +65,7 @@ int findJob(int number)     //Finds a specified process number in the list and r
     return -1;
 }
 
-int getcmd(char *prompt, char *args[], int *background)     //Parses shell input for commands and arguments
+int getCmd(char *prompt, char *args[], int *background)     //Parses shell input for commands and arguments
 {
     int length, i = 0;
     char *token, *loc;
@@ -259,7 +259,7 @@ int main(void)
 
     while(1){
         bg = 0;
-        int cnt = getcmd("\n>> ", args, &bg);
+        int cnt = getCmd("\n>> ", args, &bg);
 
         if(cnt <= 0){ 
             continue;
