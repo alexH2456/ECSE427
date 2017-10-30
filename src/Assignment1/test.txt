@@ -1,0 +1,6 @@
+total 14338
+drwxrwxrwx 0 root root   512 Oct  7 17:24 .
+drwxrwxrwx 0 root root   512 Oct  5 22:07 ..
+-rwxrwxrwx 1 root root  6289 Oct  7 17:23 A1.c
+-rwxrwxrwx 1 root root 14576 Oct  7 17:23 a.out
+-rwxrwxrwx 1 root root     0 Oct  7 17:24 test.txt
