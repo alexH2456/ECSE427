@@ -172,11 +172,11 @@ int main(int argc, char * argv[])
        
     }
     //open mutex BUFF_MUTEX_A and BUFF_MUTEX_B with inital value 1 using sem_open
-    mutexA = ;
-    mutexB = ;
+    mutexA = sem_open("/OS_MUTEX_A", O_CREAT, 0777, 1);
+    mutexB = sem_open("/OS_MUTEX_B", O_CREAT, 0777, 1);
 
     //opening the shared memory buffer ie BUFF_SHM using shm open
-    shm_fd = ;
+    shm_fd = shm_open("/OS_BUFF", O_CREAT, 0777);
     if (shm_fd == -1)
     {
         printf("prod: Shared memory failed: %s\n", strerror(errno));
@@ -184,10 +184,11 @@ int main(int argc, char * argv[])
     }
 
     //configuring the size of the shared memory to sizeof(struct table) * BUFF_SIZE usinf ftruncate
-    ftruncate(/*fill details*/)
+    //ftruncate(/*fill details*/);
 
     //map this shared memory to kernel space
-    base = mmap(/*fill details*/);
+    //base = mmap(/*fill details*/);
+    base;
     if (base == MAP_FAILED)
     {
         printf("prod: Map failed: %s\n", strerror(errno));
@@ -206,12 +207,14 @@ int main(int argc, char * argv[])
     while (ret)
     {
         printf("\n>>");
-        gets(cmd);
+        fgets(cmd, sizeof(cmd), stdin);
+        cmd[sizeof(cmd) - 1] = '\0';
         if(argc>1)
         {
             printf("Executing Command : %s\n",cmd);
         }
         ret = processCmd(cmd, base);
+        printf("%s\n", cmd);
     }
     
     //close the semphores
@@ -224,7 +227,7 @@ int main(int argc, char * argv[])
     }
 
     //unmap the shared memory
-    munmap(/*fill details*/);
+    //munmap(/*fill details*/);
     close(shm_fd);
     return 0;
 }

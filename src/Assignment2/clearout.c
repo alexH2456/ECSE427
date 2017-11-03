@@ -1,8 +1,8 @@
 #define _SVID_SOURCE
 #define _BSD_SOURCE
 #define _XOPEN_SOURCE 500
-#define _XOPEN_SORUCE 600
-#define _XOPEN_SORUCE 600
+#define _XOPEN_SOURCE 600
+#define _XOPEN_SOURCE 600
 
 #include <semaphore.h>
 #include <pthread.h>
