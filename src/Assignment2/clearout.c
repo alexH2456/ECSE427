@@ -1,8 +1,8 @@
 #define _SVID_SOURCE
 #define _BSD_SOURCE
 #define _XOPEN_SOURCE 500
-#define _XOPEN_SOURCE 600
-#define _XOPEN_SOURCE 600
+#define _XOPEN_SORUCE 600
+#define _XOPEN_SORUCE 600
 
 #include <semaphore.h>
 #include <pthread.h>
@@ -12,6 +12,7 @@
 #include <sys/mman.h>
 #include <sys/types.h>
 #include <stdlib.h>
+#include <stdio.h>
 #include <unistd.h>
 #include <time.h>
 #include <errno.h>
@@ -23,11 +24,13 @@
 int main()
 {
     printf("starting to clear namespaces\n");
-    //clearing buffer namespace
     
     //unlink shm
-   
+    shm_unlink("/OS_BUFF");
+   	
     //unlink semaphore
+    sem_unlink("/OS_MUTEX_A");
+    sem_unlink("/OS_MUTEX_B");
   
     printf("cleared namespaces\n");
     return 0;
