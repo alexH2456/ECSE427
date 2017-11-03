@@ -64,13 +64,21 @@ void initTables(struct table *base)
     }
 
     //perform a random sleep  
-    sleep(rand() % 5);
+    sleep(rand() % 3);
 
     //release the mutexes using sem_post
     sem_post(mutexA);
     sem_post(mutexB);
 
     return;
+}
+
+void populateTables(struct table *base)
+{
+    if(base->num == 0)
+    {
+        initTables(base);
+    }
 }
 
 void printTableInfo(struct table *base)
@@ -91,7 +99,7 @@ void printTableInfo(struct table *base)
     }
 
     //perform a random sleep  
-    sleep(rand() % 5);
+    sleep(rand() % 3);
     
     //release the mutexes using sem_post
     sem_post(mutexA);
@@ -127,7 +135,7 @@ void reserveSpecificTable(struct table *base, char *nameHld, char *section, int 
             printf("Invalid table number\n");
         }
         
-        sleep(rand() % 5);
+        sleep(rand() % 3);
 
         // release mutex
         sem_post(mutexA);
@@ -156,7 +164,7 @@ void reserveSpecificTable(struct table *base, char *nameHld, char *section, int 
             printf("Invalid table number\n");
         }
 
-        sleep(rand() % 5);
+        sleep(rand() % 3);
 
         // release mutex
         sem_post(mutexB);
@@ -197,7 +205,7 @@ void reserveSomeTable(struct table *base, char *nameHld, char *section)
             printf("No tables available in section %s\n", section);
         }
 
-        sleep(rand() % 5);
+        sleep(rand() % 3);
 
         //release mutex for section A
         sem_post(mutexA);
@@ -224,7 +232,7 @@ void reserveSomeTable(struct table *base, char *nameHld, char *section)
             printf("No tables available in section %s\n", section);
         }
 
-        sleep(rand() % 5);
+        sleep(rand() % 3);
 
         //release mutex for section B
         sem_post(mutexB);
@@ -268,7 +276,7 @@ int processCmd(char *cmd, struct table *base)
             printf("Please specify name and section\n");
         }
 
-        sleep(rand() % 5);
+        sleep(rand() % 3);
         break;
     case 'S':
     case 's':
@@ -347,14 +355,17 @@ int main(int argc, char * argv[])
     char cmd[100];
     int cmdType;
     int ret = 1;
+
+    populateTables(base);
+
     while (ret)
     {
         printf("\n>>");
         fgets(cmd, sizeof(cmd), stdin);
         cmd[sizeof(cmd) - 1] = '\0';
-        if(argc>1)
+        if (argc>1)
         {
-            printf("Executing Command : %s\n", cmd);
+            printf("Executing Command: %s\n", cmd);
         }
         ret = processCmd(cmd, base);
     }
@@ -364,7 +375,7 @@ int main(int argc, char * argv[])
     sem_close(mutexB);
 
     //reset the standard input
-    if (argc>1)
+    if (argc > 1)
     {
         dup2(fdstdin, 0);
     }
