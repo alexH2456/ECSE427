@@ -26,11 +26,11 @@ int main()
     printf("starting to clear namespaces\n");
     
     //unlink shm
-    shm_unlink("/OS_BUFF");
+    shm_unlink(BUFF_SHM);
    	
     //unlink semaphore
-    sem_unlink("/OS_MUTEX_A");
-    sem_unlink("/OS_MUTEX_B");
+    sem_unlink(BUFF_MUTEX_A);
+    sem_unlink(BUFF_MUTEX_B);
   
     printf("cleared namespaces\n");
     return 0;
