@@ -326,7 +326,7 @@ int main(int argc, char * argv[])
     }
 
     //opening the shared memory buffer ie BUFF_SHM using shm open
-    shm_fd = shm_open(BUFF_SHM, O_CREAT | O_RDWR, 0666);
+    shm_fd = shm_open(BUFF_SHM, O_CREAT | O_RDWR, 0777);
 
     if (shm_fd == -1)
     {
