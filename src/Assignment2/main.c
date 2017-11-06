@@ -31,28 +31,30 @@
 #define BUFF_MUTEX_A "/OS_MUTEX_A"
 #define BUFF_MUTEX_B "/OS_MUTEX_B"
 
-//declaring semaphores names for local usage
+//Semaphore declaration for both sections
 sem_t *mutexA;
 sem_t *mutexB;
 
-//declaring the shared memory and base address
+//Shared memmory and base address variables
 int shm_fd;
 void *base;
 
-//structure for indivdual table
+//Table data structure
 struct table
 {
     int num;
     char name[25];
 };
 
+//Initialize both sections with table numbers
 void initTables(struct table *base)
 {
-    //capture both mutexes using sem_wait
+    //Use sem_wait before entering critical section
     sem_wait(mutexA);
     sem_wait(mutexB);
     
-    //initialise the tables with table numbers
+    //Critical section
+
     for (int i = 0; i < 10; i++){
         (base + i)->num = i + 100;
         strcpy((base + i)->name, "");
@@ -62,8 +64,9 @@ void initTables(struct table *base)
         (base + i + 10)->num = i + 200;
         strcpy((base + i + 10)->name, "");
     }
+  
+    //End of critical section
 
-    //perform a random sleep  
     sleep(rand() % 3);
 
     //release the mutexes using sem_post
@@ -73,6 +76,7 @@ void initTables(struct table *base)
     return;
 }
 
+//Initialize database without having to call init first when shared mem is empty
 void populateTables(struct table *base)
 {
     if(base->num == 0)
@@ -81,13 +85,14 @@ void populateTables(struct table *base)
     }
 }
 
+//Display reservation info
 void printTableInfo(struct table *base)
 {
-    //capture both mutexes using sem_wait
     sem_wait(mutexA);
     sem_wait(mutexB);
     
-    //print the tables with table numbers and name
+    //Critical section
+
     printf("\nSECTION A\n\n");
     for (int i = 0; i < 10; i++){
         printf("Table %d: %s\n", (base + i)->num, (base + i)->name);
@@ -98,26 +103,28 @@ void printTableInfo(struct table *base)
         printf("Table %d: %s\n", (base + i + 10)->num, (base + i + 10)->name);
     }
 
-    //perform a random sleep  
+    //End of critical section
+
     sleep(rand() % 3);
     
-    //release the mutexes using sem_post
     sem_post(mutexA);
     sem_post(mutexB);
 
     return; 
 }
 
+//Reserve a specific table number
 void reserveSpecificTable(struct table *base, char *nameHld, char *section, int tableNo)
 {
     switch (section[0])
     {
     case 'a':
     case 'A':
-        //capture mutex for section A
+
         sem_wait(mutexA);
 
-        //check if table number belongs to section specified
+        //Critical section
+
         if (tableNo >= 100 && tableNo < 110)
         {
             if(!strcmp((base + tableNo - 100)->name, ""))
@@ -135,18 +142,20 @@ void reserveSpecificTable(struct table *base, char *nameHld, char *section, int 
             printf("Invalid table number\n");
         }
         
+        //End
+
         sleep(rand() % 3);
 
-        // release mutex
         sem_post(mutexA);
 
         break;
     case 'b':
     case 'B':
-        //capture mutex for section B
+        
         sem_wait(mutexB);
         
-        //check if table number belongs to section specified
+        //Critical section
+
         if (tableNo >= 200 && tableNo < 210)
         {
             if(!strcmp((base + tableNo - 190)->name, ""))
@@ -164,9 +173,10 @@ void reserveSpecificTable(struct table *base, char *nameHld, char *section, int 
             printf("Invalid table number\n");
         }
 
+        //End
+
         sleep(rand() % 3);
 
-        // release mutex
         sem_post(mutexB);
 
         break;
@@ -177,6 +187,7 @@ void reserveSpecificTable(struct table *base, char *nameHld, char *section, int 
     return;
 }
 
+//Reserve any table in a specified section
 void reserveSomeTable(struct table *base, char *nameHld, char *section)
 {
     int idx = -1;
@@ -186,12 +197,10 @@ void reserveSomeTable(struct table *base, char *nameHld, char *section)
     {
     case 'a':
     case 'A':
-        //capture mutex for section A
+        
         sem_wait(mutexA);
         tableFound = 0;
-        //look for empty table and reserve it ie copy name to that struct
-
-        //if no empty table print : Cannot find empty table
+        
         for(int i = 0; i < 10; i++){
             if(!strcmp((base + i)->name, ""))
             {
@@ -207,18 +216,15 @@ void reserveSomeTable(struct table *base, char *nameHld, char *section)
 
         sleep(rand() % 3);
 
-        //release mutex for section A
         sem_post(mutexA);
 
         break;
     case 'b':
     case 'B':
-        //capture mutex for section B
+        
         sem_wait(mutexB);
         tableFound = 0;
-        //look for empty table and reserve it ie copy name to that struct
-
-        //if no empty table print : Cannot find empty table
+        
         for(int i = 0; i < 10; i++){
             if(!strcmp((base + i + 10)->name, ""))
             {
@@ -234,7 +240,6 @@ void reserveSomeTable(struct table *base, char *nameHld, char *section)
 
         sleep(rand() % 3);
 
-        //release mutex for section B
         sem_post(mutexB);
 
         break;
@@ -244,6 +249,7 @@ void reserveSomeTable(struct table *base, char *nameHld, char *section)
     }
 }
 
+//Processes commands from input
 int processCmd(char *cmd, struct table *base)
 {
     char *token;
@@ -299,6 +305,7 @@ int main(int argc, char * argv[])
     char* inputFile;
     int memSize = sizeof(struct table) * BUFF_SIZE;
 
+    //Rewire file descriptor when passing test file as input
     if (argc>1)
     {
         if(access(argv[1], R_OK) == 0)
@@ -315,7 +322,8 @@ int main(int argc, char * argv[])
         }
 
     }
-    //open mutex BUFF_MUTEX_A and BUFF_MUTEX_B with inital value 1 using sem_open
+    
+    //Open mutexes
     mutexA = sem_open(BUFF_MUTEX_A, O_CREAT, 0777, 1);
     mutexB = sem_open(BUFF_MUTEX_B, O_CREAT, 0777, 1);
 
@@ -325,7 +333,7 @@ int main(int argc, char * argv[])
         exit(-1);
     }
 
-    //opening the shared memory buffer ie BUFF_SHM using shm open
+    //Open shared mem
     shm_fd = shm_open(BUFF_SHM, O_CREAT | O_RDWR, 0777);
 
     if (shm_fd == -1)
@@ -334,10 +342,8 @@ int main(int argc, char * argv[])
         exit(-1);
     }
 
-    //configuring the size of the shared memory to sizeof(struct table) * BUFF_SIZE usinf ftruncate
+    //Truncate and set base addr
     ftruncate(shm_fd, memSize);
-
-    //map this shared memory to kernel space
     base = mmap(NULL, memSize, PROT_READ | PROT_WRITE, MAP_SHARED, shm_fd, 0);
 
     if (base == MAP_FAILED)
@@ -347,13 +353,11 @@ int main(int argc, char * argv[])
         exit(-1);
     }
 
-    //intialising random number generator
+    //Rand number generator
     time_t now;
     srand((unsigned int)(time(&now)));
 
-    //array in which the user command is held
     char cmd[100];
-    int cmdType;
     int ret = 1;
 
     populateTables(base);
@@ -361,8 +365,8 @@ int main(int argc, char * argv[])
     while (ret)
     {
         printf("\n>>");
-        fgets(cmd, sizeof(cmd), stdin);
-        cmd[sizeof(cmd) - 1] = '\0';
+        fgets(cmd, sizeof(cmd), stdin);     //Use fgets instead of gets, doesn't segfault when passing no input
+        cmd[sizeof(cmd) - 1] = '\0';        //Removes carriage return from input
         if (argc>1)
         {
             printf("Executing Command: %s\n", cmd);
@@ -370,18 +374,19 @@ int main(int argc, char * argv[])
         ret = processCmd(cmd, base);
     }
     
-    //close the semphores
+    //close semaphores
     sem_close(mutexA);
     sem_close(mutexB);
 
-    //reset the standard input
+    //reset stdin
     if (argc > 1)
     {
         dup2(fdstdin, 0);
     }
 
-    //unmap the shared memory
+    //unmap shared mem
     munmap(base, memSize);
     close(shm_fd);
+
     return 0;
 }

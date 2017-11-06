@@ -22,16 +22,15 @@
 #define BUFF_MUTEX_B "/OS_MUTEX_B"
 
 int main()
-{
-    printf("starting to clear namespaces\n");
-    
-    //unlink shm
+{   
+    //unlink shared mem
     shm_unlink(BUFF_SHM);
    	
-    //unlink semaphore
+    //unlink semaphores
     sem_unlink(BUFF_MUTEX_A);
     sem_unlink(BUFF_MUTEX_B);
   
-    printf("cleared namespaces\n");
+    printf("Cleared memory\n");
+
     return 0;
 }
