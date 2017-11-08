@@ -1,3 +1,10 @@
+/* 
+* Alexander Harris - 260688155
+* ESCSE 427 - Assignment 2
+* Fall 2017
+* Reservation System
+*/
+
 #define _SVID_SOURCE
 #define _BSD_SOURCE
 #define _XOPEN_SOURCE 500

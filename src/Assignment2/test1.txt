@@ -1,0 +1,5 @@
+reserve Alex A 201
+reserve Bob B 201
+reserve Mark B
+status
+exit

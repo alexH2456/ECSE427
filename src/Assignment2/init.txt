@@ -1,5 +1,0 @@
-init
-reserve Amro A 109
-reserve Mathew B 210
-status
-exit
