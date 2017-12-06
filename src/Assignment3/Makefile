@@ -1,6 +1,6 @@
-CFLAGS = -c -g -Wall -std=gnu99 `pkg-config fuse --cflags --libs`
+CFLAGS = -c -g -Wall -std=gnu99 -D_FILE_OFFSET_BITS=64 `pkg-config fuse --cflags --libs` 
 
-LDFLAGS = `pkg-config fuse --cflags --libs`
+LDFLAGS = `pkg-config fuse --cflags --libs` 
 
 # Uncomment on of the following three lines to compile
 SOURCES= disk_emu.c sfs_api.c sfs_test.c sfs_api.h
@@ -12,7 +12,7 @@ SOURCES= disk_emu.c sfs_api.c sfs_test.c sfs_api.h
 
 
 OBJECTS=$(SOURCES:.c=.o)
-EXECUTABLE= ID_LASTNAME_FIRSTNAME
+EXECUTABLE= 260688155_HARRIS_ALEXANDER
 
 all: $(SOURCES) $(HEADERS) $(EXECUTABLE)
 
