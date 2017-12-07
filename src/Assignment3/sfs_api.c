@@ -12,8 +12,8 @@
 #define BLOCK_SIZE 1024
 #define NUM_BLOCKS 1024  //maximum number of data blocks on the disk.
 #define NUM_INODES 100
-#define NUM_BLOCKS_INODE ceil(sizeof(inode_table)/BLOCK_SIZE)
-#define NUM_BLOCKS_ROOT ceil(sizeof(root_dir)/BLOCK_SIZE)
+#define NUM_BLOCKS_INODE (sizeof(inode_t) * NUM_INODES) / BLOCK_SIZE + ((sizeof(inode_t) * NUM_INODES) % BLOCK_SIZE > 0)
+#define NUM_BLOCKS_ROOT (sizeof(directory_entry_t) * NUM_INODES) / BLOCK_SIZE + ((sizeof(directory_entry_t) * NUM_INODES) % BLOCK_SIZE > 0)
 #define MAGIC_NUMBER 0xACBD0005
 #define BITMAP_ROW_SIZE (NUM_BLOCKS/8) // this essentially mimcs the number of rows we have in the bitmap. we will have 128 rows. 
 
@@ -102,7 +102,7 @@ int init_dir() {
     empty.num = -1;
     strcpy(empty.name, "");
 
-    for (int i = 0; i < NUM_INODES; i++) {
+    for (int i = 0; i < NUM_INODES - 1; i++) {
         root_dir[i] = empty;
     }
 
@@ -120,7 +120,7 @@ int init_dir() {
 
 int write_dir() {
     int dir_written = write_blocks(NUM_BLOCKS_INODE + 1, NUM_BLOCKS_ROOT, &root_dir);
-    if (dir_written < 0) {
+    if (dir_written < NUM_BLOCKS_ROOT) {
         printf("Failed writing directory\n");
         return -1;
     }
@@ -135,7 +135,7 @@ int init_bitmap() {
         rm_index(i);
     }
     int bitmap_written = write_blocks(NUM_BLOCKS - 1, 1, &free_bit_map);
-    if (bitmap_written < 0) {
+    if (bitmap_written < 1) {
         printf("Failure initializing bitmap\n");
         return -1;
     }
@@ -145,7 +145,7 @@ int init_bitmap() {
 
 int write_bitmap() {
     int bitmap_written = write_blocks(NUM_BLOCKS - 1, 1, &free_bit_map);
-    if (bitmap_written < 0) {
+    if (bitmap_written < 1) {
         printf("Failure writing bitmap\n");
         return -1;
     }
@@ -201,7 +201,7 @@ int init_inode_table() {
 
 int write_inode_table() {
     int inode_written = write_blocks(1, NUM_BLOCKS_INODE, &inode_table);
-    if (inode_written < 0) {
+    if (inode_written < NUM_BLOCKS_INODE) {
         printf("Failure writing inode table\n");
         return -1;
     }
@@ -229,7 +229,7 @@ int init_superblock() {
 
 int write_superblock() {
     int super_written = write_blocks(0, 1, &super_block);
-    if (super_written < 0) {
+    if (super_written < 1) {
         printf("Failure writing superblock\n");
         return -1;
     }
@@ -248,11 +248,10 @@ void mksfs(int fresh) {
         init_inode_table();
         init_dir();
         init_bitmap();
-
     }
     else {
         init_disk(LASTNAME_FIRSTNAME_DISK, BLOCK_SIZE, NUM_BLOCKS);
-
+        
         int super_read = read_blocks(0, 1, &super_block);
         int bitmap_read = read_blocks(NUM_BLOCKS - 1, 1, &free_bit_map);
         int inode_read = read_blocks(1, NUM_BLOCKS_INODE, &inode_table);
@@ -270,7 +269,6 @@ void mksfs(int fresh) {
         if (dir_read < NUM_BLOCKS_ROOT) {
             printf("Failure reading root_dir\n");
         }
-
     }
 }
 
@@ -282,7 +280,7 @@ int sfs_getnextfilename(char *fname) {
             break;
         }
     }
-    if (current_file == NUM_INODES) {
+    if (current_file >= NUM_INODES) {
         current_file = 0;
         return 0;
     }
@@ -314,15 +312,15 @@ int sfs_fopen(char *name) {
         }
     }
 
-    if (file) {
+    if (file == 1) {
         //Check if file already opened in file descriptor
-        for (int i = 0; i < NUM_INODES; i++) {
+        for (int i = 1; i < NUM_INODES; i++) {
             if (fd_table[i].inodeIndex == dir_index) {
                 return i;
             }
         }
         //Find free space in fd table
-        for (int i = 0; i < NUM_INODES; i++) {
+        for (int i = 1; i < NUM_INODES; i++) {
             if (fd_table[i].inodeIndex == -1) {
                 fd_index = i;
                 break;
@@ -343,9 +341,10 @@ int sfs_fopen(char *name) {
 
     }
     else {
+        dir_index = -1;
         //Find free space in directory
         for (int i = 0; i < NUM_INODES; i++) {
-            if (root_dir[i].num < 0) {
+            if (root_dir[i].num == -1) {
                 dir_index = i;
                 break;
             }
@@ -356,7 +355,7 @@ int sfs_fopen(char *name) {
         }
 
         //Find free space in fd table
-        for (int i = 0; i < NUM_INODES; i++) {
+        for (int i = 1; i < NUM_INODES; i++) {
             if (fd_table[i].inodeIndex == -1) {
                 fd_index = i;
                 break;
@@ -445,11 +444,6 @@ int sfs_fread(int fileID, char *buf, int length) {
     int first_block = rw_ptr / BLOCK_SIZE;
     int first_block_index = rw_ptr % BLOCK_SIZE;
     int end_ptr = rw_ptr + length;
-
-    if (end_ptr > (*inode).size) {
-        end_ptr = (*inode).size;
-    }
-
     int last_block = end_ptr / BLOCK_SIZE;
     int last_block_index = end_ptr % BLOCK_SIZE;
     int bytes_written = 0;
@@ -460,7 +454,7 @@ int sfs_fread(int fileID, char *buf, int length) {
     for (int i = first_block; i <= last_block; i++) {
         memset(temp, 0, BLOCK_SIZE);
         // Indirect pointers
-        if (i > NUM_DIRECT_POINTERS - 1){
+        if (i >= NUM_DIRECT_POINTERS){
             if (ind_pointers_read == 0) {
                 read_blocks((*inode).indirectPointer, 1, temp);
                 memcpy(ind_pointers, temp, BLOCK_SIZE);
@@ -468,9 +462,8 @@ int sfs_fread(int fileID, char *buf, int length) {
                 memset(temp, 0, BLOCK_SIZE);
             }
 
-            ind_index = i - NUM_DIRECT_POINTERS - 1;
+            ind_index = i - NUM_DIRECT_POINTERS;
             read_blocks(ind_pointers[ind_index], 1, temp);
-            
         }
         // Direct pointers
         else {
@@ -498,7 +491,6 @@ int sfs_fread(int fileID, char *buf, int length) {
     // Set pointer to new position
     (*target_file).rwptr += bytes_written;
     free(temp);
-
     return bytes_written;
 }
 
@@ -534,7 +526,7 @@ int sfs_fwrite(int fileID, const char *buf, int length) {
     for (int i = first_block; i <= last_block; i++) {
         memset(temp, 0, BLOCK_SIZE);
 
-        if (i > NUM_DIRECT_POINTERS - 1) {
+        if (i >= NUM_DIRECT_POINTERS) {
             if (ind_pointers_read == 0) {
                 if ((*inode).indirectPointer == -1) {
                     (*inode).indirectPointer = get_index();
@@ -551,7 +543,11 @@ int sfs_fwrite(int fileID, const char *buf, int length) {
                 ind_pointers_read = 1;
             }
 
-            ind_index = i - NUM_DIRECT_POINTERS - 1;
+            ind_index = i - NUM_DIRECT_POINTERS;
+            if (ind_index >= NUM_INDIRECT_POINTERS) {
+                printf("Max size\n");
+                break;
+            }
             if (ind_pointers[ind_index] == -1) {
                 ind_pointers[ind_index] = get_index();
                 ind_pointers_written = 1;
@@ -586,7 +582,7 @@ int sfs_fwrite(int fileID, const char *buf, int length) {
        }
 
        //Write to disk
-       if (i > NUM_DIRECT_POINTERS - 1) {
+       if (i >= NUM_DIRECT_POINTERS) {
            write_blocks(ind_pointers[ind_index], 1, temp);
        }
        else {
@@ -602,7 +598,7 @@ int sfs_fwrite(int fileID, const char *buf, int length) {
 
     (*target_file).rwptr += bytes_written;
     if ((*inode).size < (*target_file).rwptr) {
-        (*inode).size += (*target_file).rwptr;
+        (*inode).size = (*target_file).rwptr;
     }
 
     int inode_written = write_inode_table();
