@@ -33,7 +33,7 @@ typedef struct inode_t {
  */
 typedef struct file_descriptor_t {
     uint64_t inodeIndex;
-    inode_t* inode; // 
+    inode_t* inode;
     uint64_t rwptr;
 } file_descriptor_t; 
 
