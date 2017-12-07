@@ -78,14 +78,19 @@ void rm_index(uint32_t index) {
     FREE_BIT(free_bit_map[i], bit);
 }
 
-//Helper methods for initializing and writing to disk
 int init_fdt() {
-    file_descriptor_t fd;
-    fd.rwptr = 0;
-    fd.inode = NULL;
-    fd.inodeIndex = -1;
+    file_descriptor_t fd_root;
+    fd_root.inodeIndex = 0;
+    fd_root.inode = &inode_table[0];
+    fd_root.rwptr = 0;
 
-    for (int i = 0; i < NUM_INODES; i++) {
+    file_descriptor_t fd;
+    fd.inodeIndex = -1;
+    fd.inode = NULL;
+    fd.rwptr = 0;
+
+    fd_table[0] = fd_root;
+    for (int i = 1; i < NUM_INODES; i++) {
         fd_table[i] = fd;
     }
 
@@ -93,16 +98,16 @@ int init_fdt() {
 }
 
 int init_dir() {
-    directory_entry_t root;
-    root.num = -1;
-    strcpy(root.name, "");
+    directory_entry_t empty;
+    empty.num = -1;
+    strcpy(empty.name, "");
 
     for (int i = 0; i < NUM_INODES; i++) {
-        root_dir[i] = root;
+        root_dir[i] = empty;
     }
 
     int dir_written = write_blocks(NUM_BLOCKS_INODE + 1, NUM_BLOCKS_ROOT, &root_dir);
-    if (dir_written < 0) {
+    if (dir_written < NUM_BLOCKS_ROOT) {
         printf("Failed initializing directory\n");
         return -1;
     }
@@ -138,7 +143,18 @@ int init_bitmap() {
     return 0;
 }
 
+int write_bitmap() {
+    int bitmap_written = write_blocks(NUM_BLOCKS - 1, 1, &free_bit_map);
+    if (bitmap_written < 0) {
+        printf("Failure writing bitmap\n");
+        return -1;
+    }
+    force_set_index(NUM_BLOCKS - 1);
+    return 0;
+}
+
 int init_inode_table() {
+    // Generic inode
     inode_t inode;
     inode.mode = 777;
     inode.link_cnt = 0;
@@ -146,19 +162,36 @@ int init_inode_table() {
     inode.gid = 0;
     inode.size = -1;
     inode.indirectPointer = -1;
-    for (int i = 0; i < 12; i++) {
+    for (int i = 0; i < NUM_DIRECT_POINTERS; i++) {
         inode.data_ptrs[i] = -1;
     }
 
-    for (int i = 0; i < NUM_INODES; i++) {
+    //Root dir inode
+    inode_t root;
+    root.mode = 777;
+    root.link_cnt = 0;
+    root.uid = 0;
+    root.gid = 0;
+    root.size = 0;
+    root.indirectPointer = -1;
+    for (int i = 0; i < NUM_BLOCKS_ROOT; i++) {
+        root.data_ptrs[i] = i + NUM_BLOCKS_INODE + 1;
+    }
+    for (int i = NUM_BLOCKS_ROOT; i < NUM_DIRECT_POINTERS; i++) {
+        root.data_ptrs[i] = -1;
+    }
+
+    inode_table[0] = root;
+    for (int i = 1; i < NUM_INODES; i++) {
         inode_table[i] = inode;
     }
 
     int inode_written = write_blocks(1, NUM_BLOCKS_INODE, &inode_table);
-    if (inode_written < 0) {
+    if (inode_written < NUM_BLOCKS_INODE) {
         printf("Failure initializing inode table\n");
         return -1;
     }
+    //Inode table after superblock
     for (int i = 1; i < inode_written; i++) {
         force_set_index(i);
     }
@@ -181,12 +214,12 @@ int write_inode_table() {
 int init_superblock() {
     super_block.magic = MAGIC_NUMBER;
     super_block.block_size = BLOCK_SIZE;
-    super_block.fs_size = NUM_BLOCKS * BLOCK_SIZE;
+    super_block.fs_size = NUM_BLOCKS;
     super_block.inode_table_len = NUM_INODES;
     super_block.root_dir_inode = 0;
 
     int super_written = write_blocks(0, 1, &super_block);
-    if (super_written < 0) {
+    if (super_written < 1) {
         printf("Failure initializing superblock\n");
         return -1;
     }
@@ -205,12 +238,10 @@ int write_superblock() {
 }
 
 void mksfs(int fresh) {
-   
+    
     init_fdt();
 
     if (fresh) {
-        unlink(LASTNAME_FIRSTNAME_DISK); //Delete disk if already existing.
-
         init_fresh_disk(LASTNAME_FIRSTNAME_DISK, BLOCK_SIZE, NUM_BLOCKS);
 
         init_superblock();
@@ -237,7 +268,7 @@ void mksfs(int fresh) {
             printf("Failure reading inode table\n");
         }
         if (dir_read < NUM_BLOCKS_ROOT) {
-            printf("Failure reading root directory\n");
+            printf("Failure reading root_dir\n");
         }
 
     }
@@ -250,13 +281,11 @@ int sfs_getnextfilename(char *fname) {
             current_file = i + 1;
             break;
         }
-        return 0;
     }
-    if (current_file > NUM_INODES) {
+    if (current_file == NUM_INODES) {
         current_file = 0;
         return 0;
     }
-
     return 1;
 }
 
@@ -266,14 +295,17 @@ int sfs_getfilesize(const char* path) {
             return inode_table[root_dir[i].num].size;
         }
     }
-    printf("Couldn't get file size(file dne)\n");
+    printf("File does not exist\n");
     return -1;
 }
 
 int sfs_fopen(char *name) {
+
     int file = 0;
     int dir_index = -1;
+    int fd_index = -1;
 
+    //Check if file exists
     for (int i = 0; i < NUM_INODES; i++) {
         if (!strcmp(root_dir[i].name, name)) {
             file = 1;
@@ -290,7 +322,6 @@ int sfs_fopen(char *name) {
             }
         }
         //Find free space in fd table
-        int fd_index = -1;
         for (int i = 0; i < NUM_INODES; i++) {
             if (fd_table[i].inodeIndex == -1) {
                 fd_index = i;
@@ -325,7 +356,6 @@ int sfs_fopen(char *name) {
         }
 
         //Find free space in fd table
-        int fd_index = -1;
         for (int i = 0; i < NUM_INODES; i++) {
             if (fd_table[i].inodeIndex == -1) {
                 fd_index = i;
@@ -337,8 +367,9 @@ int sfs_fopen(char *name) {
             return -1;
         }
 
+        //Find free space in inode table
         int inode = -1;
-        for (int i = 0; i < NUM_INODES; i++) {
+        for (int i = 1; i < NUM_INODES; i++) {
             if (inode_table[i].size == -1) {
                 inode = i;
                 break;
@@ -375,9 +406,14 @@ int sfs_fopen(char *name) {
 int sfs_fclose(int fileID) {
 
     file_descriptor_t empty;
-    empty.rwptr = 0;
-    empty.inode = NULL;
     empty.inodeIndex = -1;
+    empty.inode = NULL;
+    empty.rwptr = 0;
+
+    if (fileID > NUM_INODES || fileID < 0) {
+        printf("Invalid fileID\n");
+        return -1;
+    }
 
     if (fd_table[fileID].inodeIndex == -1) {
         printf("File is already closed/does not exist\n");
@@ -389,18 +425,258 @@ int sfs_fclose(int fileID) {
 }
 
 int sfs_fread(int fileID, char *buf, int length) {
-    return 0;
+
+    if (fileID > NUM_INODES || fileID < 0) {
+        printf("Invalid fileID\n");
+        return -1;
+    }
+
+    file_descriptor_t* target_file = &fd_table[fileID];
+    int rw_ptr = (*target_file).rwptr;
+    inode_t* inode = (*target_file).inode;
+
+    if ((*target_file).inodeIndex == -1) {
+        printf("Can't read closed file\n");
+        return -1;
+    }
+
+    void* temp = malloc(BLOCK_SIZE);
+
+    int first_block = rw_ptr / BLOCK_SIZE;
+    int first_block_index = rw_ptr % BLOCK_SIZE;
+    int end_ptr = rw_ptr + length;
+
+    if (end_ptr > (*inode).size) {
+        end_ptr = (*inode).size;
+    }
+
+    int last_block = end_ptr / BLOCK_SIZE;
+    int last_block_index = end_ptr % BLOCK_SIZE;
+    int bytes_written = 0;
+    int ind_pointers[NUM_INDIRECT_POINTERS];
+    int ind_index;
+    int ind_pointers_read = 0;
+    
+    for (int i = first_block; i <= last_block; i++) {
+        memset(temp, 0, BLOCK_SIZE);
+        // Indirect pointers
+        if (i > NUM_DIRECT_POINTERS - 1){
+            if (ind_pointers_read == 0) {
+                read_blocks((*inode).indirectPointer, 1, temp);
+                memcpy(ind_pointers, temp, BLOCK_SIZE);
+                ind_pointers_read = 1;
+                memset(temp, 0, BLOCK_SIZE);
+            }
+
+            ind_index = i - NUM_DIRECT_POINTERS - 1;
+            read_blocks(ind_pointers[ind_index], 1, temp);
+            
+        }
+        // Direct pointers
+        else {
+            read_blocks((*inode).data_ptrs[i], 1, temp);
+        }
+        if (i == first_block) {
+            if (first_block == last_block) {
+                memcpy(buf, temp + first_block_index, last_block_index - first_block_index);
+                bytes_written += last_block_index - first_block_index;
+            }
+            else {
+                memcpy(buf, temp + first_block_index, BLOCK_SIZE - first_block_index);
+                bytes_written += BLOCK_SIZE - first_block_index;
+            }
+        }
+        else if (i == last_block) {
+            memcpy(buf + bytes_written, temp, last_block_index);
+            bytes_written += last_block_index;
+        }
+        else {
+            memcpy(buf + bytes_written, temp, BLOCK_SIZE);
+            bytes_written += BLOCK_SIZE;
+        }
+    }
+    // Set pointer to new position
+    (*target_file).rwptr += bytes_written;
+    free(temp);
+
+    return bytes_written;
 }
 
 int sfs_fwrite(int fileID, const char *buf, int length) {
-    return 0;
+
+    if (fileID > NUM_INODES || fileID < 0) {
+        printf("Invalid fileID\n");
+        return -1;
+    }
+
+    file_descriptor_t* target_file = &fd_table[fileID];
+    int rw_ptr = (*target_file).rwptr;
+    inode_t* inode = (*target_file).inode;
+
+    if ((*target_file).inodeIndex == -1) {
+        printf("Can't read closed file\n");
+        return -1;
+    }
+
+    void* temp = malloc(BLOCK_SIZE);
+
+    int first_block = rw_ptr / BLOCK_SIZE;
+    int first_block_index = rw_ptr % BLOCK_SIZE;
+    int end_ptr = rw_ptr + length;
+    int last_block = end_ptr / BLOCK_SIZE;
+    int last_block_index = end_ptr % BLOCK_SIZE;
+    int bytes_written = 0;
+    int ind_pointers[NUM_INDIRECT_POINTERS];
+    int ind_index;
+    int ind_pointers_read = 0;
+    int ind_pointers_written = 0;
+
+    for (int i = first_block; i <= last_block; i++) {
+        memset(temp, 0, BLOCK_SIZE);
+
+        if (i > NUM_DIRECT_POINTERS - 1) {
+            if (ind_pointers_read == 0) {
+                if ((*inode).indirectPointer == -1) {
+                    (*inode).indirectPointer = get_index();
+                    for (int j = 0; j < NUM_INDIRECT_POINTERS; j++) {
+                        ind_pointers[j] = -1;
+                    }
+                    ind_pointers_written = 1;
+                }
+                else {
+                    read_blocks((*inode).indirectPointer, 1, temp);
+                    memcpy(ind_pointers, temp, BLOCK_SIZE);
+                    memset(temp, 0, BLOCK_SIZE);
+                }
+                ind_pointers_read = 1;
+            }
+
+            ind_index = i - NUM_DIRECT_POINTERS - 1;
+            if (ind_pointers[ind_index] == -1) {
+                ind_pointers[ind_index] = get_index();
+                ind_pointers_written = 1;
+            }
+            read_blocks(ind_pointers[ind_index], 1, temp);
+        }
+       else {
+           if ((*inode).data_ptrs[i] == -1) {
+               (*inode).data_ptrs[i] = get_index();
+           }
+           read_blocks((*inode).data_ptrs[i], 1, temp);
+       }
+
+       //Copy to buffer
+       if (i == first_block) {
+           if (first_block == last_block) {
+               memcpy(temp + first_block_index, buf, last_block_index - first_block_index);
+               bytes_written += last_block_index - first_block_index;
+           }
+           else {
+               memcpy(temp + first_block_index, buf, BLOCK_SIZE - first_block_index);
+               bytes_written += BLOCK_SIZE - first_block_index;
+           }
+       }
+       else if (i == last_block) {
+           memcpy(temp, buf + bytes_written, last_block_index);
+           bytes_written += last_block_index;
+       }
+       else {
+           memcpy(temp, buf + bytes_written, BLOCK_SIZE);
+           bytes_written += BLOCK_SIZE;
+       }
+
+       //Write to disk
+       if (i > NUM_DIRECT_POINTERS - 1) {
+           write_blocks(ind_pointers[ind_index], 1, temp);
+       }
+       else {
+           write_blocks((*inode).data_ptrs[i], 1, temp);
+       }
+    }
+
+    if (ind_pointers_written == 1) {
+        memset(temp, 0, BLOCK_SIZE);
+        memcpy(temp, ind_pointers, BLOCK_SIZE);
+        write_blocks((*inode).indirectPointer, 1, temp);
+    }
+
+    (*target_file).rwptr += bytes_written;
+    if ((*inode).size < (*target_file).rwptr) {
+        (*inode).size += (*target_file).rwptr;
+    }
+
+    int inode_written = write_inode_table();
+    int bitmap_written = write_bitmap();
+    if (inode_written < 0 || bitmap_written < 0) {
+        printf("Failed writing changes to disk\n");
+        return -1;
+    }
+
+    free(temp);
+    return bytes_written;
 }
 
 int sfs_fseek(int fileID, int loc) {
+    
+    if (fileID > NUM_INODES || fileID < 0) {
+        printf("Invalid filedID\n");
+        return -1;
+    }
+    if (fd_table[fileID].inodeIndex == -1) {
+        printf("Can't seek closed file\n");
+        return -1;
+    }
+    if (loc > inode_table[fd_table[fileID].inodeIndex].size) {
+        printf("Loc larger than file\n");
+        return -1;
+    }
+
+    fd_table[fileID].rwptr = loc;
+
     return 0;
 }
 
 int sfs_remove(char *file) {
+
+    // Search for file in dir
+    int inode_index = -1;
+    for (int i = 0; i < NUM_INODES; i++) {
+        if(!strcmp(root_dir[i].name, file)) {
+            inode_index = root_dir[i].num;
+            break;
+        }
+    }
+    if (inode_index == -1) {
+        printf("File not found\n");
+        return -1;
+    }
+
+    // Check for file in fd table and close it if found
+    for (int i = 0; i < NUM_INODES; i++) {
+        if (fd_table[i].inodeIndex == inode_index) {
+            sfs_fclose(i);
+            break;
+        }
+    }
+
+    inode_t* inode = &inode_table[inode_index];
+    void* temp = malloc(BLOCK_SIZE);
+    int last_block = (*inode).size / BLOCK_SIZE;
+
+    // Ignore indirect pointers for now
+    for (int i = 0; i <= last_block; i++) {
+        memset(temp, 0, BLOCK_SIZE);
+        write_blocks((*inode).data_ptrs[i], 1, temp);
+        rm_index((*inode).data_ptrs[i]);
+        (*inode).data_ptrs[i] = -1;
+    }
+
+    (*inode).size = -1;
+    write_bitmap();
+    write_dir();
+    write_inode_table();
+    //free(temp);
+
     return 0;
 }
 

@@ -5,6 +5,8 @@
 
 #define MAX_FILE_NAME 20
 #define MAX_EXTENSION_NAME 3
+#define NUM_DIRECT_POINTERS 12  
+#define NUM_INDIRECT_POINTERS 256
 
 typedef struct superblock_t{
     uint64_t magic;
@@ -15,13 +17,13 @@ typedef struct superblock_t{
 } superblock_t;
 
 typedef struct inode_t {
-    int mode;
-    int link_cnt;
-    int uid;
-    int gid;
-    int size;
-    int data_ptrs[12];
-    int indirectPointer; // points to a data block that points to other data blocks (Single indirect)
+    unsigned int mode;
+    unsigned int link_cnt;
+    unsigned int uid;
+    unsigned int gid;
+    unsigned int size;
+    unsigned int data_ptrs[NUM_DIRECT_POINTERS];
+    unsigned int indirectPointer; // points to a data block that points to other data blocks (Single indirect)
 } inode_t;
 
 /*

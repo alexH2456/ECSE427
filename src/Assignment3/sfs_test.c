@@ -124,7 +124,7 @@ main(int argc, char **argv)
                 chunksize, tmp);
         error_count++;
       }
-      free(buffer);
+      //free(buffer);
     }
   }
 
@@ -150,7 +150,7 @@ main(int argc, char **argv)
   }
 
   fds[1] = sfs_fopen(names[1]);
-  
+
   sfs_fseek(fds[0], 0);
   sfs_fseek(fds[1], 0);
   
@@ -180,7 +180,7 @@ main(int argc, char **argv)
           break;
         }
       }
-      free(buffer);
+      //free(buffer);
     }
   }
 

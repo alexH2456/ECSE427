@@ -1,6 +1,6 @@
-CFLAGS = -c -g -Wall -std=gnu99 -D_FILE_OFFSET_BITS=64 `pkg-config fuse --cflags --libs` 
+CFLAGS = -c -g -Wall -std=gnu99 `pkg-config fuse --cflags --libs` 
 
-LDFLAGS = `pkg-config fuse --cflags --libs` 
+LDFLAGS = -lm `pkg-config fuse --cflags --libs` 
 
 # Uncomment on of the following three lines to compile
 SOURCES= disk_emu.c sfs_api.c sfs_test.c sfs_api.h
