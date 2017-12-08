@@ -3,21 +3,17 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <strings.h>
-#include <unistd.h>
-//#include <fuse.h>
-#include <strings.h>
+#include <fuse.h>
 #include "disk_emu.h"
 
 // Alexander Harris - 260688155
-// Still problems with test 1, read and write not working properly
+// Still problems with test 1, read and write not working properly due to indirect pointer implementation.
+// Setting the number of direct pointers to 14 passes test 1.
 // Test 2 segfaults
 
 #define LASTNAME_FIRSTNAME_DISK "HARRIS_ALEXANDER.disk"
 #define BLOCK_SIZE 1024
 #define NUM_INODES 100
-#define NUM_DIRECT_POINTERS 12
-#define NUM_INDIRECT_POINTERS 256
 #define NUM_BLOCKS_INODE (sizeof(inode_t) * NUM_INODES) / BLOCK_SIZE + ((sizeof(inode_t) * NUM_INODES) % BLOCK_SIZE > 0)
 #define NUM_BLOCKS_ROOT (sizeof(directory_entry) * (NUM_INODES)) / BLOCK_SIZE + ((sizeof(directory_entry) * (NUM_INODES)) % BLOCK_SIZE > 0)
 
@@ -503,7 +499,7 @@ int sfs_fread(int fileID, char *buf, int length)
     {
         memset(temp, 0, BLOCK_SIZE);
         // Indirect pointers
-        if (i >= NUM_DIRECT_POINTERS)
+        if (i > NUM_DIRECT_POINTERS - 1)
         {
             if (ind_pointers_read == 0)
             {
@@ -605,7 +601,7 @@ int sfs_fwrite(int fileID, const char *buf, int length)
     {
         memset(temp, 0, BLOCK_SIZE);
 
-        if (i >= NUM_DIRECT_POINTERS)
+        if (i > NUM_DIRECT_POINTERS - 1)
         {
             if (ind_pointers_read == 0)
             {
